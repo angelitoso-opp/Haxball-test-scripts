@@ -1,0 +1,14 @@
+# Dependencias de Node
+node_modules/
+
+# Tu base de datos local (para no sobreescribir el dinero de tus jugadores)
+database.json
+HostVoley/database.json
+HostMinigames/database.json
+
+# Archivos del sistema operativo
+.DS_Store
+Thumbs.db
+
+# (Opcional) Si usas variables de entorno para contraseñas/tokens
+.env
