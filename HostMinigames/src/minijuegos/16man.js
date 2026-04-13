@@ -148,6 +148,7 @@ function procesarGol16Man(room) {
         // ⚠️ AÚN VIVE (Dejamos que Haxball siga su flujo normal de reinicio de gol)
         room.sendAnnouncement(`⚠️ Arco de ${player.name} perforado. Le quedan ${gameState.vidas[idVictima]} vidas.`, null, 0xFFEE99);
     }
+}
 
     // 🏃‍♂️ EVENTO: ALGUIEN ABANDONA LA SALA
     function removerJugadorDesconectado(room, player) {
@@ -174,6 +175,6 @@ function procesarGol16Man(room) {
         }
     }
 
-}
 
-module.exports = { iniciar16Man, procesarGol16Man };
+
+module.exports = { iniciar16Man, procesarGol16Man, removerJugadorDesconectado };
