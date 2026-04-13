@@ -2,7 +2,7 @@
 const HaxballJS = require('haxball.js'); 
 
 const { iniciar16Man, procesarGol16Man, removerJugadorDesconectado } = require('./src/minijuegos/16man');
-
+const { toggleAutoHost, revisarAutoHost } = require('./src/minijuegos/autohost');
 // 1. INICIALIZAMOS LA SALA PRIMERO
 const HaxballInit = HaxballJS.default || HaxballJS;
 
@@ -40,10 +40,26 @@ HaxballInit().then((HBInit) => {
         }
         return false;
     }
+    // 3. autohost para 16man
+    if (message === "!autohost") {
+        toggleAutoHost(room, player);
+        return false;
+    }
 };
 
     room.onTeamGoal = function(team) {
         procesarGol16Man(room);
+    };
+
+    room.onPlayerJoin = function(player) {
+    revisarAutoHost(room);
+    };
+
+    // Si termina un partido (por tiempo o goles), el bot vuelve a repartir y empezar
+    room.onTeamVictory = function(scores) {
+    setTimeout(() => {
+        revisarAutoHost(room);
+    }, 5000); // 5 segundos de celebración antes del siguiente partido
     };
 
     room.onPlayerLeave = function(player) {
