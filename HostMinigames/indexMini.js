@@ -3,6 +3,7 @@ const HaxballJS = require('haxball.js');
 
 const { iniciar16Man, procesarGol16Man, removerJugadorDesconectado } = require('./src/minijuegos/16man');
 const { toggleAutoHost, revisarAutoHost } = require('./src/minijuegos/autohost');
+const { enviarMenuMapas, cargarMapaManual } = require('./src/minijuegos/mapasMenu');
 // 1. INICIALIZAMOS LA SALA PRIMERO
 const HaxballInit = HaxballJS.default || HaxballJS;
 
@@ -23,7 +24,9 @@ HaxballInit().then((HBInit) => {
     // ==========================================
 
     room.onPlayerChat = function(player, message) {
-    
+    let args = message.split(" ");
+    let cmd = args[0].toLowerCase();
+
     // 👑 1. LA CONTRASEÑA SECRETA PARA SER ADMIN
     if (message === "liam" || message === "!liam") { 
         room.setPlayerAdmin(player.id, true);
@@ -45,6 +48,30 @@ HaxballInit().then((HBInit) => {
         toggleAutoHost(room, player);
         return false;
     }
+    // 📜 COMANDO: VER LA LISTA DE MAPAS
+    if (cmd === "!mapas") {
+        if (player.admin) {
+            enviarMenuMapas(room, player.id);
+        } else {
+            room.sendAnnouncement("⚠️ Solo el Admin puede ver la bodega de mapas.", player.id, 0xFF0000);
+        }
+        return false;
+    }
+
+    // 🚀 COMANDO: CARGAR UN MAPA ESPECÍFICO
+    if (cmd === "!mapa") {
+        if (player.admin) {
+            let mapaPedido = args[1]; // Lo que escribe después de !mapa
+            
+            if (!mapaPedido) {
+                room.sendAnnouncement("⚠️ Uso: !mapa [nombre]. Ejemplo: !mapa dodgeball", player.id, 0xFFEE99);
+            } else {
+                cargarMapaManual(room, mapaPedido, player.id);
+            }
+        }
+        return false;
+    }
+    
 };
 
     room.onTeamGoal = function(team) {
