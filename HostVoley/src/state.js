@@ -1,9 +1,9 @@
 // Configuración de tu sala
 const CONFIG = {
-    TEAM_SIZE: 3,
-    NET_ZONE_X: 23,
-    NET_ZONE_Y: 64,
-    BOOST_MATE: 1.20
+    TEAM_SIZE: 2,
+    NET_ZONE_X: 24,
+    NET_ZONE_Y: 63,
+    BOOST_MATE: 1.00
 };
 
 // Variables en tiempo real (El Estado Global)

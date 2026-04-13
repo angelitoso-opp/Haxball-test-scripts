@@ -16,7 +16,7 @@ HaxballInit().then((HBInit) => {
         maxPlayers: 16,
         public: true,
         noPlayer: true,
-        token: "thr1.AAAAAGnc0C_J26oTtLGXUg.kWVk6fEC2SQ" // <--- ⚠️ PON TU TOKEN AQUÍ
+        token: "thr1.AAAAAGndUH6l3IzdkZRXJA.sadS5MyFtNI" // <--- ⚠️ PON TU TOKEN AQUÍ
     });
 
     // ==========================================
@@ -71,7 +71,7 @@ HaxballInit().then((HBInit) => {
         }
         return false;
     }
-    
+
 };
 
     room.onTeamGoal = function(team) {

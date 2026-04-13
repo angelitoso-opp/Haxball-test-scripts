@@ -298,7 +298,7 @@ function procesarChat(player, message, room) {
                 
                 room.pauseGame(false);
                 state.isAfkProtocolActive = false;
-                if (state.botActive) { const { fillCancha } = require('./src/gameplay'); fillCancha(room); }
+                if (state.botActive) { const { fillCancha } = require('./gameplay'); fillCancha(room); }
             }, 5000);
 
         } else {

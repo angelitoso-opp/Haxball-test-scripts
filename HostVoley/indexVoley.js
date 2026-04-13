@@ -20,14 +20,14 @@ HaxballInit().then((HBInit) => {
       maxPlayers: 16,
       public: true,
       noPlayer: false,
-      token: "thr1.AAAAAGncCg-m_YL3adCOcA.jEME9HfTpYU" // Considera renovarlo si caducó
+      token: "thr1.AAAAAGndUH6l3IzdkZRXJA.sadS5MyFtNI" // Considera renovarlo si caducó
     });
 
 
 
     room.setScoreLimit(5); 
     room.setTimeLimit(3);
-    try { room.setCustomStadium(fs.readFileSync('./3dVolley.hbs', 'utf8')); console.log("✅ Mapa cargado."); } catch (e) {}
+    try { room.setCustomStadium(fs.readFileSync('./HostVoley/mapaVoli.hbs', 'utf8')); console.log("✅ Mapa cargado."); } catch (e) {}
     
     loadDB(); // Inicia la base de datos
 
