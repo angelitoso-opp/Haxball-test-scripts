@@ -9,7 +9,7 @@ const { procesarChat } = require('./src/comandos.js');
 const { procesarToqueBola, procesarGol, procesarVictoria } = require('./src/gameplay.js');
 const { sendHelpBox, sendWelcomeBox, sendTiendaBox, iniciarAnuncios } = require('./src/ui.js');
 const { aplicarUniformesAleatorios } = require('./src/uniforms.js');
-const { explotarConfeti } = require ('./src/efectos.js')
+const { explotarConfeti, activarEfectoDisco } = require ('./src/efectos.js')
 
 const HaxballInit = HaxballJS.default || HaxballJS;
 
@@ -18,14 +18,11 @@ HaxballInit().then((HBInit) => {
     var room = HBInit({
       roomName: "🏐 VOLEY SERIEDAD | SOLO CABRAZOS Y CON NIVEL ",
       maxPlayers: 16,
-      public: true,
+      public: false,
       noPlayer: false,
       token: "thr1.AAAAAGnefwnMjzzPRTA4sw.DDYSaufcULg" // Considera renovarlo si caducó
     });
 
-
-
-    room.setScoreLimit(5); 
     room.setTimeLimit(3);
     try { room.setCustomStadium(fs.readFileSync('./HostVoley/mapaVoli.hbs', 'utf8')); console.log("✅ Mapa cargado."); } catch (e) {}
     
@@ -79,6 +76,7 @@ HaxballInit().then((HBInit) => {
       calcularCuotas(room);
 
       room.sendAnnouncement("🎰 ¡PARTIDO INICIADO! Escribe '!apostar rojo (monto)' o '!apostar azul (monto)'", null, 0xFFD700, "bold");
+      room.setScoreLimit(3);
     };
 
     // 👁️ RASTREADOR: Guarda el milisegundo exacto de la última actividad
@@ -179,6 +177,23 @@ HaxballInit().then((HBInit) => {
             if (datosUsuario.efecto === "disco") {
                 room.sendAnnouncement(`🪩 ¡EFECTO DISCO DE ${goleador.name.toUpperCase()}! 🪩`, null, 0xFFD700, "bold");
                 activarEfectoDisco(room, goleador.id, goleador.name);
+            }
+        }
+
+        let puntajes = room.getScores();
+
+        if (puntajes) {
+            let limiteActual = puntajes.scoreLimit;
+
+            // Si ambos equipos están exactamente a 1 punto de alcanzar el límite
+            // Ejemplo: Límite es 5. El marcador acaba de ponerse 4 a 4.
+            if (puntajes.red === limiteActual - 1 && puntajes.blue === limiteActual - 1) {
+                
+                let nuevoLimite = limiteActual + 1;
+                room.setScoreLimit(nuevoLimite); // Cambiamos el límite del cuarto en vivo
+                
+                // Hacemos que la sala tiemble con el anuncio
+                room.sendAnnouncement(`🔥 ¡DEUCE! Empate técnico. El límite sube a ${nuevoLimite} puntos 🔥`, null, 0xFF6600, "bold");
             }
         }
     }

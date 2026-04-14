@@ -1,9 +1,10 @@
 const { db, saveDB, getRank, initPlayerDB } = require('./database');
 const { state, CONFIG } = require('./state');
 const { apostar } = require('./apuestas');
-const { fillCancha } = require('./gameplay'); 
+const { fillCancha, iniciarSistemaPickeo ,iniciarTurnoCapitan } = require('./gameplay'); 
 const { sendHelpBox,sendTiendaBox, se } = require('./ui'); // Ajusta la ruta si es necesario
 const { activarEfectoDisco } = require ('./efectos')
+
 function procesarChat(player, message, room) {
     if (!db.players[player.name]) initPlayerDB(player.name); 
     var dbUser = db.players[player.name];
@@ -20,16 +21,24 @@ function procesarChat(player, message, room) {
             
             let numeroElegido = parseInt(msg);
 
+            // Si es un número válido (mayor a 0)
             if (!isNaN(numeroElegido) && numeroElegido > 0) {
                 
-                // 👻 AQUÍ TAMBIÉN: Filtramos al ID 0
-                let elegibles = room.getPlayerList().filter(p => p.team === 0 && p.id !== 0 && !state.afkModeUsers[p.id]);
+                // 🛠️ EL MISMO PARCHE: Que el chat lea exactamente la misma lista que se imprimió
+                let elegibles = room.getPlayerList().filter(p => 
+                    p.team === 0 && 
+                    p.id !== 0 && 
+                    p.id !== state.capitanes[1] && 
+                    p.id !== state.capitanes[2] && 
+                    !state.afkModeUsers[p.id]
+                );
                 
                 if (numeroElegido > elegibles.length) {
                     room.sendAnnouncement("❌ Número inválido. Ese jugador no existe en la lista.", player.id, 0xFF8888);
                     return false; 
                 }
 
+                // Rescatamos al jugador elegido
                 let targetPlayer = elegibles[numeroElegido - 1]; 
 
                 clearTimeout(state.pickTimer);

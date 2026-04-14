@@ -309,18 +309,26 @@ function iniciarSistemaPickeo(room) {
 function iniciarTurnoCapitan(room, equipo) {
     let capitanId = state.capitanes[equipo];
     let capitan = room.getPlayer(capitanId);
+    
     if (!capitan) return; 
 
     let color = equipo === 1 ? 0xFF8888 : 0x8888FF;
     
-    // 1. Mostrar la lista de jugadores disponibles a toda la sala
-    let elegibles = getEspectadoresElegibles(room);
+    // 🛠️ EL PARCHE: Filtramos a los espectadores, y eliminamos explícitamente a los 2 capitanes
+    let elegibles = room.getPlayerList().filter(p => 
+        p.team === 0 && 
+        p.id !== 0 && 
+        p.id !== state.capitanes[1] && 
+        p.id !== state.capitanes[2] && 
+        !state.afkModeUsers[p.id]
+    );
+    
     let listaFiltro = elegibles.map((p, i) => `[${i + 1}] ${p.name}`).join(" | ");
     
     room.sendAnnouncement(`⏱️ Turno de ${capitan.name}. Tienes 10s. Escribe el NÚMERO:`, null, color, "bold");
     room.sendAnnouncement(`📋 Disponibles: ${listaFiltro}`, null, 0x88FFFF);
 
-    // 2. Limpiamos cualquier temporizador viejo y arrancamos el de 10 segundos
+    // 2. Limpiamos cualquier temporizador viejo y arrancamos el de 17 segundos
     clearTimeout(state.pickTimer);
     state.pickTimer = setTimeout(() => {
         
@@ -332,7 +340,7 @@ function iniciarTurnoCapitan(room, equipo) {
         state.isPicking = false;
         setTimeout(() => iniciarSistemaPickeo(room), 2000); 
 
-    }, 10000); // 10000 ms = 10 segundos
+    }, 17000); // 10000 ms = 10 segundos
 }
 
 module.exports = { procesarToqueBola, procesarGol, procesarVictoria, fillCancha, iniciarSistemaPickeo, iniciarTurnoCapitan, getEspectadoresElegibles
