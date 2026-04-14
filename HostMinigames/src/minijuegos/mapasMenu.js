@@ -16,7 +16,17 @@ const catalogoMapas = {
     "espadas": "pelea de espadas.hbs",
     "rey": "Rey De la escalera.hbs",
     "salta": "Salta Sobrevive.hbs",
-    "sillas": "Sillitas.hbs"
+    "sillas": "Sillitas.hbs",
+    "lucky2": "lucky2.hbs",
+    "lucky3": "lucky3.hbs",
+    "Parkour3": "ParkourVertical.hbs",
+    "Parkour4": "Reversa Salto.hbs",
+    "salta2": "Salta Sobrevive2.hbs",
+    "kk": "Kong.hbs",
+    "carrera2": "Carrera2.hbs",
+    "carrera3": "Carrera3.hbs",
+    "bajar": "CarreraBaja.hbs",
+    "esquivar2": "esquivar2.hbs"
 };
 
 // 📜 MOSTRAR EL MENÚ EN EL CHAT
