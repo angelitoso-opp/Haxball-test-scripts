@@ -193,12 +193,42 @@ function procesarVictoria(scores, room) {
 }
   
 function fillCancha(room) {
+    if (state.isPicking) return;
+    
     if (!state.botActive || state.isSubstituting) return;
+    
     var p = room.getPlayerList(), red = p.filter(x => x.team === 1), blue = p.filter(x => x.team === 2);
     
     // Obtenemos a los espectadores activos
     var specs = p.filter(x => x.team === 0 && x.id !== 0 && !state.afkModeUsers[x.id]);
     
+    // ==========================================
+    // 🛑 EL INTERCEPTOR DE 2v2 (A PRUEBA DE BALAS)
+    // ==========================================
+    if (CONFIG.TEAM_SIZE == 2 && room.getScores() == null) {
+        // Usamos == por si el número 2 está guardado como texto ("2")
+        // Y aseguramos que el juego esté detenido (getScores == null)
+
+        // Si los equipos ya están 2 y 2, significa que el Pickeo acaba de terminar 
+        // y estamos esperando los 2 segundos para que arranque el partido. No hacemos nada.
+        if (red.length === 2 && blue.length === 2) {
+            return; 
+        }
+
+        // Contamos a TODOS los jugadores activos en la sala
+        let totalJugadores = red.length + blue.length + specs.length;
+
+        if (totalJugadores >= 4) {
+            // Hay gente suficiente en la sala: ¡Arranca el Pickeo!
+            iniciarSistemaPickeo(room); 
+            return; // 🛑 El bot viejo se apaga aquí.
+        } else {
+            // No hay 4 personas todavía: Congelamos la sala y esperamos a que entre el cuarto
+            return; 
+        }
+    }
+    // ==========================================
+
     // 🎟️ MAGIA VIP: Reordenamos la lista de espectadores. Los que están en state.colaVIP van de primeros.
     specs.sort((a, b) => {
         let aIsVip = state.colaVIP.includes(a.id) ? 1 : 0;
@@ -234,5 +264,76 @@ function fillCancha(room) {
         room.sendAnnouncement("📢 ¡CANCHA LLENA! GRITA TU 'GO' PARA INICIAR EL SET", null, 0xFFDD00, "bold");
     }
 }
+// Helper para obtener a los que pueden ser elegidos
+function getEspectadoresElegibles(room) {
+    // 👻 El p.id !== 0 es la magia para que el bot sea ignorado
+    return room.getPlayerList().filter(p => p.team === 0 && p.id !== 0 && !state.afkModeUsers[p.id]);
+}
 
-module.exports = { procesarToqueBola, procesarGol, procesarVictoria, fillCancha };
+function iniciarSistemaPickeo(room) {
+    if (CONFIG.TEAM_SIZE !== 2) return;
+    room.stopGame();
+    state.isPicking = true;
+    
+    // Todos a la tribuna
+    room.getPlayerList().forEach(p => {
+        if (p.team !== 0) room.setPlayerTeam(p.id, 0);
+    });
+
+    let elegibles = getEspectadoresElegibles(room);
+
+    if (elegibles.length < 4) {
+        room.sendAnnouncement("⚠️ No hay suficientes jugadores listos para un 2v2 (Mínimo 4).", null, 0xFFEE99);
+        state.isPicking = false;
+        return;
+    }
+
+    let capRojo = elegibles[0];
+    let capAzul = elegibles[1];
+
+    state.capitanes[1] = capRojo.id;
+    state.capitanes[2] = capAzul.id;
+    state.turnoPick = 1; 
+
+    room.setPlayerTeam(capRojo.id, 1);
+    room.setPlayerTeam(capAzul.id, 2);
+
+    room.sendAnnouncement(`👑 ¡SISTEMA DE PICKEO 2v2 INICIADO!`, null, 0xFFD700, "bold");
+    room.sendAnnouncement(`🔴 Capitán Rojo: ${capRojo.name} | 🔵 Capitán Azul: ${capAzul.name}`, null, 0xFFFFFF, "bold");
+
+    // Arranca el reloj para el capitán rojo
+    iniciarTurnoCapitan(room, 1);
+}
+
+// ⏱️ EL RELOJ Y LA LISTA
+function iniciarTurnoCapitan(room, equipo) {
+    let capitanId = state.capitanes[equipo];
+    let capitan = room.getPlayer(capitanId);
+    if (!capitan) return; 
+
+    let color = equipo === 1 ? 0xFF8888 : 0x8888FF;
+    
+    // 1. Mostrar la lista de jugadores disponibles a toda la sala
+    let elegibles = getEspectadoresElegibles(room);
+    let listaFiltro = elegibles.map((p, i) => `[${i + 1}] ${p.name}`).join(" | ");
+    
+    room.sendAnnouncement(`⏱️ Turno de ${capitan.name}. Tienes 10s. Escribe el NÚMERO:`, null, color, "bold");
+    room.sendAnnouncement(`📋 Disponibles: ${listaFiltro}`, null, 0x88FFFF);
+
+    // 2. Limpiamos cualquier temporizador viejo y arrancamos el de 10 segundos
+    clearTimeout(state.pickTimer);
+    state.pickTimer = setTimeout(() => {
+        
+        // 💀 ¡BOOM! Se acabó el tiempo
+        room.kickPlayer(capitanId, "para la siguiente solo pon 1", false);
+        room.sendAnnouncement(`🚨 ¡${capitan.name} se quedó dormido y fue pateado! Reiniciando el pickeo...`, null, 0xFF5555, "bold");
+        
+        // Reiniciamos todo el sistema de pickeo
+        state.isPicking = false;
+        setTimeout(() => iniciarSistemaPickeo(room), 2000); 
+
+    }, 10000); // 10000 ms = 10 segundos
+}
+
+module.exports = { procesarToqueBola, procesarGol, procesarVictoria, fillCancha, iniciarSistemaPickeo, iniciarTurnoCapitan, getEspectadoresElegibles
+ };

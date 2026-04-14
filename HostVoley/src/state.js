@@ -22,6 +22,10 @@ const state = {
     isAfkProtocolActive: false,
     autoAfkActivo: true,
     afkModeUsers: {},
+    isPicking: false,
+    capitanes: { 1: null, 2: null },
+    turnoPick: 0,
+    pickTimer: null, // 1 (Rojo) o 2 (Azul)
     colaVIP: []
     
 };

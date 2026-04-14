@@ -20,7 +20,7 @@ HaxballInit().then((HBInit) => {
       maxPlayers: 16,
       public: true,
       noPlayer: false,
-      token: "thr1.AAAAAGndUH6l3IzdkZRXJA.sadS5MyFtNI" // Considera renovarlo si caducó
+      token: "thr1.AAAAAGnefwnMjzzPRTA4sw.DDYSaufcULg" // Considera renovarlo si caducó
     });
 
 
@@ -157,15 +157,34 @@ HaxballInit().then((HBInit) => {
         });
     };
 
+
+    let ultimoEnPatear = null;
+
     room.onPlayerBallKick = function(player) {
       procesarToqueBola(player, room); // Llama a gameplay.js
+      ultimoEnPatear = player.id; // Guardamos el ID del último que tocó el balón
     };
 
     room.onTeamGoal = function(team) {
 
       procesarGol(team, room); // Llama a gameplay.js
       explotarConfeti(room);
-
+    if (ultimoEnPatear) {
+        let goleador = room.getPlayer(ultimoEnPatear);
+        
+        if (goleador && db.players[goleador.name]) {
+            let datosUsuario = db.players[goleador.name];
+            
+            // Si el goleador compró el efecto disco, ¡lo activamos!
+            if (datosUsuario.efecto === "disco") {
+                room.sendAnnouncement(`🪩 ¡EFECTO DISCO DE ${goleador.name.toUpperCase()}! 🪩`, null, 0xFFD700, "bold");
+                activarEfectoDisco(room, goleador.id, goleador.name);
+            }
+        }
+    }
+    
+    // Limpiamos la variable para el siguiente saque
+    ultimoEnPatear = null;
     };
 
     room.onTeamVictory = function(scores) {

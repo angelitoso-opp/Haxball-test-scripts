@@ -34,7 +34,7 @@ function enviarMenuMapas(room, playerId) {
 
 // 🚀 CARGAR EL MAPA SELECCIONADO
 function cargarMapaManual(room, comandoPeticion, playerId) {
-    let claveMapa = comandoPeticion.toLowerCase();
+    let claveMapa = comandoPeticion.trim().toLowerCase();
 
     // Verificamos si la palabra existe en nuestro catálogo
     if (!catalogoMapas[claveMapa]) {
@@ -45,8 +45,13 @@ function cargarMapaManual(room, comandoPeticion, playerId) {
     let nombreArchivo = catalogoMapas[claveMapa];
 
     try {
-        // ⚠️ AJUSTA ESTA RUTA según dónde pusiste la carpeta con esos mapas
-        let rutaMapa = path.join(__dirname, '../../mapas/otros', nombreArchivo); 
+        let rutaMapa = path.join(__dirname, '../../mapas', nombreArchivo);
+
+        if (!fs.existsSync(rutaMapa)) {
+            room.sendAnnouncement("🚨 No se encontró el archivo del mapa en disco.", playerId, 0xFF0000);
+            console.log("❌ Archivo no encontrado:", rutaMapa);
+            return;
+        }
         
         let contenidoMapa = fs.readFileSync(rutaMapa, 'utf8');
         room.stopGame(); // Frenamos por si se estaba jugando

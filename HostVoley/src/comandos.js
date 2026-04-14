@@ -10,8 +10,50 @@ function procesarChat(player, message, room) {
     var userRank = getRank(dbUser.elo);
     var msg = message.trim(), args = msg.split(" "), cmd = args[0].toLowerCase();
 
+    // 🎯 SISTEMA DE PICKEO POR NÚMEROS (1, 2, 3...)
+    if (state.isPicking) {
+        let equipoTurno = state.turnoPick;
+        let idCapitanTurno = state.capitanes[equipoTurno];
+
+        // Validamos si el que escribió es el capitán de turno
+        if (player.id === idCapitanTurno) {
+            
+            let numeroElegido = parseInt(msg);
+
+            if (!isNaN(numeroElegido) && numeroElegido > 0) {
+                
+                // 👻 AQUÍ TAMBIÉN: Filtramos al ID 0
+                let elegibles = room.getPlayerList().filter(p => p.team === 0 && p.id !== 0 && !state.afkModeUsers[p.id]);
+                
+                if (numeroElegido > elegibles.length) {
+                    room.sendAnnouncement("❌ Número inválido. Ese jugador no existe en la lista.", player.id, 0xFF8888);
+                    return false; 
+                }
+
+                let targetPlayer = elegibles[numeroElegido - 1]; 
+
+                clearTimeout(state.pickTimer);
+
+                room.setPlayerTeam(targetPlayer.id, equipoTurno);
+                let colorAviso = equipoTurno === 1 ? 0xFF8888 : 0x8888FF;
+                room.sendAnnouncement(`✅ ¡${player.name} ha reclutado a ${targetPlayer.name}!`, null, colorAviso, "bold");
+
+                if (equipoTurno === 1) {
+                    state.turnoPick = 2; // Turno del Azul
+                    iniciarTurnoCapitan(room, 2);
+                } else {
+                    state.isPicking = false; // Se acabó el pickeo
+                    room.sendAnnouncement("🚀 ¡EQUIPOS COMPLETOS! Empezando en 2 segundos...", null, 0x88FF88, "bold");
+                    setTimeout(() => { room.startGame(); }, 2000);
+                }
+                
+                return false; 
+            }
+        }
+    }
+
     // Sistema GO (Permite a espectadores y jugadores)
-    if (state.isWaitingForPlayers && /^g+o+$/i.test(msg)) {
+   /* if (state.isWaitingForPlayers && /^g+o+$/i.test(msg)) {
         if (!state.readyPlayers.has(player.id)) {
             state.readyPlayers.add(player.id);
             
@@ -28,7 +70,7 @@ function procesarChat(player, message, room) {
             }
         }
         return false; 
-    }
+    }*/
 
     // ⚙️ COMANDO ADMIN: CAMBIAR TAMAÑO DE EQUIPOS (1v1, 2v2, 3v3, etc)
     if (cmd === "!modo" || cmd === "!size") {

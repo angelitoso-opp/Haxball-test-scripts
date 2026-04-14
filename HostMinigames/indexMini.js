@@ -12,11 +12,11 @@ HaxballInit().then((HBInit) => {
     
     // Aquí es donde nace la variable 'room'
     var room = HBInit({
-        roomName: "⚔️ BATTLE ROYALE | 16 MAN ⚔️",
-        maxPlayers: 16,
+        roomName: "⚔️4v4 y despues minis ⚔️",
+        maxPlayers: 18,
         public: true,
         noPlayer: true,
-        token: "thr1.AAAAAGndUH6l3IzdkZRXJA.sadS5MyFtNI" // <--- ⚠️ PON TU TOKEN AQUÍ
+        token: "thr1.AAAAAGnd4NdUargo5VDm8g.Ok3Qp1GGT88" // <--- ⚠️ PON TU TOKEN AQUÍ
     });
 
     // ==========================================
