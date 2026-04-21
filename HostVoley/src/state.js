@@ -1,9 +1,9 @@
 // Configuración de tu sala
 const CONFIG = {
     TEAM_SIZE: 2, // Empezará en 2v2 por defecto
-    NET_ZONE_X: 24,
+    NET_ZONE_X: 30,
     NET_ZONE_Y: 63,
-    BOOST_MATE: 1.00
+    BOOST_MATE: 1.09
 };
 
 // Variables en tiempo real (El Estado Global)
@@ -14,6 +14,7 @@ const state = {
     juegoTerminadoPorVictoria: false, // 🛡️ Escudo para que las apuestas no se bugueen
     voleyLastPlayer: null, 
     wasLastTouchBlock: false,
+    currentMap: "voley", // Puede ser "voley" o "practica"
     botActive: true, // 🤖 ¡Se prende solo al abrir la sala!
     botLoop: null,
     lastTouch: { id: null, team: null, name: "" }, 

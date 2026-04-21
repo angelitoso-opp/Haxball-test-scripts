@@ -20,7 +20,7 @@ HaxballInit().then((HBInit) => {
       maxPlayers: 16,
       public: true, 
       noPlayer: false,
-      token: "thr1.AAAAAGnnnhRbP--Sw77hfg.f6IkrEIBF8Y" // Considera renovarlo si caducó
+      token: "thr1.AAAAAGnn60fR5ghc4lvzkw.uSy3cjBlGCs" // Considera renovarlo si caducó
     });
 
     room.setTimeLimit(0);
@@ -40,21 +40,48 @@ HaxballInit().then((HBInit) => {
     }, 1500);
 
     // === EVENTOS DEL JUEGO ===
-    room.onPlayerJoin = function(p) { initPlayerDB(p.name); };
-    room.onPlayerLeave = function(p) { if (state.readyPlayers.has(p.id)) state.readyPlayers.delete(p.id); };
-    
-    room.onPlayerChat = function(player, message) {
-      // ✍️ RASTREADOR DE CHAT: Si habla, no está AFK
-        if (!state.afkData[player.id]) state.afkData[player.id] = {};
-        state.afkData[player.id].lastMove = Date.now();
-
-        return procesarChat(player, message, room); // Llama a comandos.js
+    room.onPlayerJoin = function(p) { 
+    initPlayerDB(p.name); 
+    gestionarMapas(room); // 👈 ¡NUEVO!
     };
 
+   room.onPlayerLeave = function(p) { 
+        if (state.readyPlayers.has(p.id)) state.readyPlayers.delete(p.id); 
+        
+        // 🛡️ SISTEMA DE SUSTITUCIÓN POR PICKEO
+        if (room.getScores() != null && p.team !== 0) {
+            let equipoAfectado = p.team;
+            // Buscamos al compañero que se quedó solo en la cancha
+            let sobreviviente = room.getPlayerList().find(x => x.team === equipoAfectado && x.id !== p.id);
+
+            if (sobreviviente) {
+                room.stopGame(); // Detenemos el partido
+                state.isPicking = true; // Activamos modo elección
+                state.capitanes[equipoAfectado] = sobreviviente.id;
+                state.turnoPick = equipoAfectado;
+
+                room.sendAnnouncement(`⚠️ ${p.name} abandonó el partido.`, null, 0xFF4444, "bold");
+                room.sendAnnouncement(`📢 ${sobreviviente.name}, elige a tu nuevo compañero de los espectadores.`, null, 0xFFFFFF, "bold");
+                
+                // Llamamos a la función de turnos que ya tenemos en gameplay.js
+                const { iniciarTurnoCapitan } = require('./src/gameplay.js');
+                iniciarTurnoCapitan(room, equipoAfectado);
+            } else {
+                // Si el equipo quedó vacío (ej. era 1v1), reseteamos la sala
+                room.stopGame();
+                state.isPicking = false;
+                room.getPlayerList().forEach(x => { if(x.id !== 0) room.setPlayerTeam(x.id, 0); });
+            }
+        }
+        
+        gestionarMapas(); 
+    };
+    
     room.onGameStart = function() {
       // ♾️ SISTEMA DE LÍMITE MANUAL
       state.scoreLimit = 5; // Volvemos al límite oficial
       state.juegoTerminadoPorVictoria = false; // Bajamos el escudo de apuestas
+      state.isStarting = false; // 👈 Bajamos el escudo al iniciar
       room.setScoreLimit(0); // Forzamos a Haxball a infinito
 
       // Limpiamos variables
@@ -158,7 +185,34 @@ HaxballInit().then((HBInit) => {
         state.juegoTerminadoPorVictoria = false; // Lo reiniciamos por si acaso
     };
 
-    
+     // 🗺️ GESTOR DE MAPAS AUTOMÁTICO
+    const gestionarMapas = () => {
+        // Contamos SOLO a los jugadores reales que NO están en modo AFK voluntario
+        let count = room.getPlayerList().filter(p => p.id !== 0 && !state.afkModeUsers[p.id]).length;
+        
+        if (count === 1 && state.currentMap !== "practica") {
+            try {
+                room.stopGame();
+                room.setCustomStadium(fs.readFileSync('./HostVoley/practica.hbs', 'utf8'));
+                state.currentMap = "practica";
+                room.sendAnnouncement("🏗️ MODO PRÁCTICA: Entrenando solo...", null, 0x88FFFF, "bold");
+                
+                // Buscamos al único jugador y lo metemos a la cancha
+                let unicoJugador = room.getPlayerList().find(p => p.id !== 0 && !state.afkModeUsers[p.id]);
+                if (unicoJugador) room.setPlayerTeam(unicoJugador.id, 1);
+                
+                room.startGame();
+            } catch (e) { console.log("Error mapa práctica", e); }
+            
+        } else if (count >= 2 && state.currentMap !== "voley") {
+            try {
+                room.stopGame();
+                room.setCustomStadium(fs.readFileSync('./HostVoley/mapaVoli.hbs', 'utf8'));
+                state.currentMap = "voley";
+                room.sendAnnouncement("🏐 ¡RIVAL DETECTADO! Mapa Oficial Cargado.", null, 0x88FF88, "bold");
+            } catch (e) { console.log("Error mapa oficial", e); }
+        }
+    };
 
     let ultimoEnPatear = null;
 
@@ -215,5 +269,6 @@ HaxballInit().then((HBInit) => {
       procesarVictoria(scores, room); // Llama a gameplay.js
     };
 
+    
     room.onRoomLink = function(link) { console.log("\n🔥 👉 ENTRA AQUÍ: " + link + "\n"); };
 });

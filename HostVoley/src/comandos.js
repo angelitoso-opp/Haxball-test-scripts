@@ -42,17 +42,27 @@ function procesarChat(player, message, room) {
                 let targetPlayer = elegibles[numeroElegido - 1]; 
 
                 clearTimeout(state.pickTimer);
+                state.pickTimer = null; // Eliminamos rastro del timer
 
                 room.setPlayerTeam(targetPlayer.id, equipoTurno);
                 let colorAviso = equipoTurno === 1 ? 0xFF8888 : 0x8888FF;
                 room.sendAnnouncement(`✅ ¡${player.name} ha reclutado a ${targetPlayer.name}!`, null, colorAviso, "bold");
 
-                // 🧠 EVALUACIÓN INTELIGENTE DE TURNOS
-                let redCount = room.getPlayerList().filter(p => p.team === 1).length;
-                let blueCount = room.getPlayerList().filter(p => p.team === 2).length;
+                // 🧠 EVALUACIÓN INTELIGENTE (PREDICTIVA ANTI-BUGS)
+                // Contamos nosotros mismos a los jugadores en vez de esperar a que Haxball actualice
+                let redCount = 0;
+                let blueCount = 0;
+                
+                room.getPlayerList().forEach(p => {
+                    // Si es el jugador que acabamos de mover, le sumamos a su nuevo equipo manualmente
+                    let equipoReal = (p.id === targetPlayer.id) ? equipoTurno : p.team;
+                    if (equipoReal === 1) redCount++;
+                    if (equipoReal === 2) blueCount++;
+                });
 
-                if (redCount === CONFIG.TEAM_SIZE && blueCount === CONFIG.TEAM_SIZE) {
+                if (redCount == CONFIG.TEAM_SIZE && blueCount == CONFIG.TEAM_SIZE) {
                     state.isPicking = false; // Se acabó el pickeo
+                    state.isStarting = true; // 🛡️ LEVANTAMOS EL ESCUDO AQUÍ TAMBIÉN
                     room.sendAnnouncement("🚀 ¡EQUIPOS COMPLETOS! Empezando en 2 segundos...", null, 0x88FF88, "bold");
                     setTimeout(() => { room.startGame(); }, 2000);
                 } else {
@@ -67,7 +77,6 @@ function procesarChat(player, message, room) {
                 }
                 
                 return false;
-            
             }
         }
     }
@@ -301,7 +310,7 @@ function procesarChat(player, message, room) {
         let sospechosos = room.getPlayerList().filter(p => 
             p.team === player.team && 
             p.id !== player.id && 
-            (ahora - (state.afkData[p.id]?.lastMove || 0)) > 1000 
+            (ahora - (state.afkData[p.id]?.lastMove || 0)) > 3000 
         );
 
         if (sospechosos.length > 0) {

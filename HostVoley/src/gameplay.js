@@ -55,7 +55,14 @@ function procesarToqueBola(player, room) {
     if (!pos || !ballPos) return;
     
     var allowDoubleTouch = (room.getPlayerList().filter(p => p.team == team).length <= 1);
-    var isBlocking = Math.abs(pos.x) <= CONFIG.NET_ZONE_X && pos.y <= CONFIG.NET_ZONE_Y;
+    
+    // 🔥 EL SECRETO ESTÁ AQUÍ: Separar la zona de bloqueo de la regla de procedencia
+    var estaEnZonaDeBloqueo = Math.abs(pos.x) <= CONFIG.NET_ZONE_X && pos.y <= CONFIG.NET_ZONE_Y;
+    var vieneDelRival = (state.voleyLastTeam !== null && state.voleyLastTeam !== team);
+    
+    // Solo es bloqueo si estás en la zona Y el balón viene del enemigo
+    var isBlocking = estaEnZonaDeBloqueo && vieneDelRival; 
+    
     var isKickoff = (state.redTouches === 0 && state.blueTouches === 0);
     
     let ball = getBallIndex(room); 
@@ -87,7 +94,7 @@ function procesarToqueBola(player, room) {
                     room.setDiscProperties(ball, { xspeed: cb.xspeed * CONFIG.BOOST_MATE, yspeed: cb.yspeed * CONFIG.BOOST_MATE }); 
                 }
             }
-        } else { state.redTouches = 0; setBallColor(room, 1); }
+        } else { state.redTouches = 0; setBallColor(room, 1); } // El bloqueo resetea a 0 y color 1
     } else if (team == 2) { 
         if (state.voleyLastTeam != 2) state.blueTouches = 0; 
         if (!isBlocking) {
@@ -193,7 +200,8 @@ function procesarVictoria(scores, room) {
 }
   
 function fillCancha(room) {
-    if (state.isPicking || !state.botActive || state.isSubstituting) return;
+    // 🛡️ ESCUDO ANTI-BUCLES
+    if (state.isPicking || !state.botActive || state.isSubstituting || state.isStarting) return;
     
     var p = room.getPlayerList();
     var red = p.filter(x => x.team === 1);
@@ -201,24 +209,16 @@ function fillCancha(room) {
     var specs = p.filter(x => x.team === 0 && x.id !== 0 && !state.afkModeUsers[x.id]);
     
     let totalJugadores = red.length + blue.length + specs.length;
-    let cuposLlenos = (red.length === CONFIG.TEAM_SIZE && blue.length === CONFIG.TEAM_SIZE);
 
-    if (room.getScores() == null && !cuposLlenos) {
-        
-        // FASE 4: Más jugadores de lo que pide el modo -> ¡SISTEMA DE PICKEO!
+    if (room.getScores() == null) {
+        // 👑 1. SI HAY 5 O MÁS -> SISTEMA DE PICKEO (Capitanes)
         if (totalJugadores > CONFIG.TEAM_SIZE * 2) {
             iniciarSistemaPickeo(room); 
             return; 
         }
-
-        // FASE 3: Si están exactos (ej. 4 en 2v2), caen al auto-fill abajo
-        // FASE 2: Si faltan, no mete a nadie, obliga a esperar (excepto para 1v1 en sala vacía)
-        if (totalJugadores < CONFIG.TEAM_SIZE * 2) {
-            if (red.length > 0 || blue.length > 0) return; 
-        }
     }
 
-    // 🎟️ AUTO-FILL (Solo si no hay gente suficiente para pickear)
+    // ⚡ 2. AUTO-FILL (Acomodar a la gente en los huecos)
     specs.sort((a, b) => {
         let aIsVip = state.colaVIP.includes(a.id) ? 1 : 0;
         let bIsVip = state.colaVIP.includes(b.id) ? 1 : 0;
@@ -227,9 +227,6 @@ function fillCancha(room) {
 
     while (specs.length > 0 && (red.length < CONFIG.TEAM_SIZE || blue.length < CONFIG.TEAM_SIZE)) {
         var spec = specs.shift(); 
-        let vipIndex = state.colaVIP.indexOf(spec.id);
-        if (vipIndex !== -1) state.colaVIP.splice(vipIndex, 1);
-
         if (red.length <= blue.length) { 
             room.setPlayerTeam(spec.id, 1); 
             red.push(spec); 
@@ -239,10 +236,19 @@ function fillCancha(room) {
         }
     }
     
+    // 🚀 3. AUTO-START INTELIGENTE
     red = room.getPlayerList().filter(x => x.team === 1); 
     blue = room.getPlayerList().filter(x => x.team === 2);
-    if (room.getScores() == null && red.length === CONFIG.TEAM_SIZE && blue.length === CONFIG.TEAM_SIZE) {
-        room.sendAnnouncement("🚀 ¡SALA LISTA! Empezando partido rápido...", null, 0x88FF88, "bold");
+    
+    // El juego arranca automáticamente si:
+    // - Hay 1v1 (2 personas en total)
+    // - O están los equipos llenos (4 personas en total)
+    let es1v1 = (red.length === 1 && blue.length === 1);
+    let es2v2 = (red.length === 2 && blue.length === 2);
+
+    if (room.getScores() == null && (es1v1 || es2v2) && totalJugadores >= 2) {
+        state.isStarting = true; // 🛡️ Levantamos escudo
+        room.sendAnnouncement(es1v1 ? "🚀 ¡Duelo 1v1! Empezando..." : "🚀 ¡Partido 2v2! Empezando...", null, 0x88FF88, "bold");
         setTimeout(() => { room.startGame(); }, 2000);
     }
 }
