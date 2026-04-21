@@ -47,62 +47,41 @@ function procesarChat(player, message, room) {
                 let colorAviso = equipoTurno === 1 ? 0xFF8888 : 0x8888FF;
                 room.sendAnnouncement(`✅ ¡${player.name} ha reclutado a ${targetPlayer.name}!`, null, colorAviso, "bold");
 
-                if (equipoTurno === 1) {
+               if (equipoTurno === 1) {
                     state.turnoPick = 2; // Turno del Azul
                     iniciarTurnoCapitan(room, 2);
                 } else {
-                    state.isPicking = false; // Se acabó el pickeo
-                    room.sendAnnouncement("🚀 ¡EQUIPOS COMPLETOS! Empezando en 2 segundos...", null, 0x88FF88, "bold");
-                    setTimeout(() => { room.startGame(); }, 2000);
+                    // Verificamos si los equipos ya están completos (Para 2v2 terminará rápido, para 3v3 dará otra vuelta)
+                    let redCount = room.getPlayerList().filter(p => p.team === 1).length;
+                    let blueCount = room.getPlayerList().filter(p => p.team === 2).length;
+
+                    if (redCount === CONFIG.TEAM_SIZE && blueCount === CONFIG.TEAM_SIZE) {
+                        state.isPicking = false; // Se acabó el pickeo
+                        room.sendAnnouncement("🚀 ¡EQUIPOS COMPLETOS! Empezando en 2 segundos...", null, 0x88FF88, "bold");
+                        setTimeout(() => { room.startGame(); }, 2000);
+                    } else {
+                        // 🔁 Si faltan jugadores (en 3v3), vuelve a ser el turno del Capitán Rojo
+                        state.turnoPick = 1;
+                        iniciarTurnoCapitan(room, 1);
+                    }
                 }
-                
                 return false; 
             }
         }
     }
 
-    // Sistema GO (Permite a espectadores y jugadores)
-   /* if (state.isWaitingForPlayers && /^g+o+$/i.test(msg)) {
-        if (!state.readyPlayers.has(player.id)) {
-            state.readyPlayers.add(player.id);
-            
-            // Calculamos cuántos GO faltan para arrancar
-            var faltan = (CONFIG.TEAM_SIZE * 2) - state.readyPlayers.size;
-            
-            if (faltan > 0) {
-                room.sendAnnouncement("✅ " + player.name + " dio su GO. (Faltan " + faltan + ")", null, 0x88FFCC);
-            } else { 
-                room.sendAnnouncement("🚀 ¡AL SAQUE!", null, 0x88FF88, "bold"); 
-                state.isWaitingForPlayers = false; 
-                state.readyPlayers.clear(); 
-                room.startGame(); 
-            }
-        }
-        return false; 
-    }*/
-
     // ⚙️ COMANDO ADMIN: CAMBIAR TAMAÑO DE EQUIPOS (1v1, 2v2, 3v3, etc)
     if (cmd === "!modo" || cmd === "!size") {
-        if (!player.admin) return false; // Solo admins
-        
+        if (!player.admin) return false;
         let nuevoTamano = parseInt(args[1]);
 
-        if (isNaN(nuevoTamano) || nuevoTamano < 1 || nuevoTamano > 8) {
-            room.sendAnnouncement("⚠️ Uso: !modo [número] (Ej: '!modo 3' para jugar 3v3)", player.id, 0xFFEE99);
+        if (nuevoTamano !== 2 && nuevoTamano !== 3) {
+            room.sendAnnouncement("⚠️ Uso: !modo 2 o !modo 3 (El servidor es exclusivo para 2v2 y 3v3)", player.id, 0xFFEE99);
             return false;
         }
 
-        // Actualizamos la variable global
         CONFIG.TEAM_SIZE = nuevoTamano;
-        
-        room.sendAnnouncement(`⚙️ [SISTEMA] El Admin cambió el formato de la sala a ${nuevoTamano} vs ${nuevoTamano}.`, null, 0x88FFFF, "bold");
-        
-        // Si el bot está prendido, forzamos que meta/saque gente de la cancha inmediatamente
-        if (state.botActive) {
-            const { fillCancha } = require('./gameplay'); 
-            fillCancha(room);
-        }
-        
+        room.sendAnnouncement(`⚙️ [SISTEMA] El Admin cambió el formato a ${nuevoTamano} vs ${nuevoTamano}.`, null, 0x88FFFF, "bold");
         return false;
     }
 

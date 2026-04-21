@@ -18,18 +18,26 @@ HaxballInit().then((HBInit) => {
     var room = HBInit({
       roomName: "🏐 VOLEY SERIEDAD | SOLO CABRAZOS Y CON NIVEL ",
       maxPlayers: 16,
-      public: false,
+      public: true, 
       noPlayer: false,
-      token: "thr1.AAAAAGnefwnMjzzPRTA4sw.DDYSaufcULg" // Considera renovarlo si caducó
+      token: "thr1.AAAAAGnhLfZ_-Y20-QxwkQ.OKiTyrKgLEQ" // Considera renovarlo si caducó
     });
 
-    room.setTimeLimit(3);
+    room.setTimeLimit(0);
     try { room.setCustomStadium(fs.readFileSync('./HostVoley/mapaVoli.hbs', 'utf8')); console.log("✅ Mapa cargado."); } catch (e) {}
     
     loadDB(); // Inicia la base de datos
 
     // === EVENTOS DEL JUEGO ===
     iniciarAnuncios(room); 
+    
+    // 🤖 EL MOTOR DEL BOT AUTOMÁTICO
+    state.botLoop = setInterval(() => {
+        if (state.botActive) {
+            const { fillCancha } = require('./src/gameplay.js');
+            fillCancha(room);
+        }
+    }, 1500);
 
     // === EVENTOS DEL JUEGO ===
     room.onPlayerJoin = function(p) { initPlayerDB(p.name); };
@@ -76,7 +84,6 @@ HaxballInit().then((HBInit) => {
       calcularCuotas(room);
 
       room.sendAnnouncement("🎰 ¡PARTIDO INICIADO! Escribe '!apostar rojo (monto)' o '!apostar azul (monto)'", null, 0xFFD700, "bold");
-      room.setScoreLimit(3);
     };
 
     // 👁️ RASTREADOR: Guarda el milisegundo exacto de la última actividad
@@ -139,10 +146,13 @@ HaxballInit().then((HBInit) => {
     };
 
     room.onGameStop = function() {
-      devolverDinero(room); // Llama a apuestas.js
-      state.apuestas = {}; state.apuestasAbiertas = false;
+        // 🛡️ Solo devuelve el dinero si el partido se cortó manualmente (No si alguien ganó)
+        if (!state.juegoTerminadoPorVictoria) {
+            devolverDinero(room); 
+        }
+        state.apuestas = {}; state.apuestasAbiertas = false;
+        state.juegoTerminadoPorVictoria = false; // Lo reiniciamos por si acaso
     };
-
     room.onPositionsReset = function() {
         state.redTouches = 0; state.blueTouches = 0; state.wasLastTouchBlock = false;
         state.voleyLastTeam = null; state.voleyLastPlayer = null; 
@@ -167,33 +177,40 @@ HaxballInit().then((HBInit) => {
 
       procesarGol(team, room); // Llama a gameplay.js
       explotarConfeti(room);
-    if (ultimoEnPatear) {
-        let goleador = room.getPlayer(ultimoEnPatear);
-        
-        if (goleador && db.players[goleador.name]) {
-            let datosUsuario = db.players[goleador.name];
+        if (ultimoEnPatear) {
+            let goleador = room.getPlayer(ultimoEnPatear);
             
-            // Si el goleador compró el efecto disco, ¡lo activamos!
-            if (datosUsuario.efecto === "disco") {
-                room.sendAnnouncement(`🪩 ¡EFECTO DISCO DE ${goleador.name.toUpperCase()}! 🪩`, null, 0xFFD700, "bold");
-                activarEfectoDisco(room, goleador.id, goleador.name);
+            if (goleador && db.players[goleador.name]) {
+                let datosUsuario = db.players[goleador.name];
+                
+                // Si el goleador compró el efecto disco, ¡lo activamos!
+                if (datosUsuario.efecto === "disco") {
+                    room.sendAnnouncement(`🪩 ¡EFECTO DISCO DE ${goleador.name.toUpperCase()}! 🪩`, null, 0xFFD700, "bold");
+                    activarEfectoDisco(room, goleador.id, goleador.name);
+                }
             }
-        }
 
-        let puntajes = room.getScores();
-
+            let puntajes = room.getScores();
         if (puntajes) {
-            let limiteActual = puntajes.scoreLimit;
+            let redPts = puntajes.red;
+            let bluePts = puntajes.blue;
 
-            // Si ambos equipos están exactamente a 1 punto de alcanzar el límite
-            // Ejemplo: Límite es 5. El marcador acaba de ponerse 4 a 4.
-            if (puntajes.red === limiteActual - 1 && puntajes.blue === limiteActual - 1) {
+            // 🔥 DEUCE: Si empatan a 1 punto del límite (ej. 4-4)
+            if (redPts === state.scoreLimit - 1 && bluePts === state.scoreLimit - 1) {
+                state.scoreLimit++;
+                room.sendAnnouncement(`🔥 ¡DEUCE! Empate técnico. El límite sube a ${state.scoreLimit} puntos 🔥`, null, 0xFF6600, "bold");
+            }
+
+            // 🏆 VICTORIA MANUAL: Si alguien alcanza el límite Y saca 2 puntos de ventaja
+            let redGana = redPts >= state.scoreLimit && (redPts - bluePts) >= 2;
+            let blueGana = bluePts >= state.scoreLimit && (bluePts - redPts) >= 2;
+
+            if (redGana || blueGana) {
+                state.juegoTerminadoPorVictoria = true; // Subimos el escudo de apuestas
+                room.stopGame(); // Frenamos el juego manualmente (esto dispara onGameStop al instante)
                 
-                let nuevoLimite = limiteActual + 1;
-                room.setScoreLimit(nuevoLimite); // Cambiamos el límite del cuarto en vivo
-                
-                // Hacemos que la sala tiemble con el anuncio
-                room.sendAnnouncement(`🔥 ¡DEUCE! Empate técnico. El límite sube a ${nuevoLimite} puntos 🔥`, null, 0xFF6600, "bold");
+                // Procesamos los ELOs y pagos
+                procesarVictoria(puntajes, room); 
             }
         }
     }
