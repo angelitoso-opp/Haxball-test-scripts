@@ -164,7 +164,6 @@ function procesarVictoria(scores, room) {
         if (!db.players[p.name]) initPlayerDB(p.name); 
         var dbUser = db.players[p.name];
         
-        // 🔒 EL CANDADO: Solo damos ELO si es Ranked
         if (state.isRankedMatch) { 
             if (p.team === winningTeam) { 
                 dbUser.wins++; dbUser.elo += 25; dbUser.coins += 10; 
@@ -174,21 +173,22 @@ function procesarVictoria(scores, room) {
                 room.sendAnnouncement(`📉 -15 ELO`, p.id, 0xFF8888);
             }
         } else {
-            // Si es Unranked, le avisamos al perdedor que se salvó
             if (p.team === losingTeam) {
                 room.sendAnnouncement(`🤝 Partida Unranked: Tu ELO está a salvo.`, p.id, 0xAAAAAA);
             }
         }
         
-        // El perdedor siempre sale a la banca, sea ranked o no
-        if (p.team === losingTeam) room.setPlayerTeam(p.id, 0); 
+        // 👑 SISTEMA REY DE LA CANCHA
+        if (p.team === losingTeam) {
+            room.setPlayerTeam(p.id, 0); // Perdedores a la banca
+        } else if (p.team === winningTeam) {
+            room.setPlayerTeam(p.id, 1); // ¡GANADORES SIEMPRE AL ROJO!
+        }
         
         saveDB(); 
     });
     
-    var specs = room.getPlayerList().filter(p => p.team === 0 && p.id !== 0 && !state.afkModeUsers[p.id]);
-    for (var i = 0; i < CONFIG.TEAM_SIZE; i++) { if (specs[i]) room.setPlayerTeam(specs[i].id, losingTeam); }
-
+    // ❌ AQUÍ ELIMINAMOS EL BUCLE QUE AUTO-RELLENABA. AHORA EL BOT DECIDE.
     setTimeout(() => { if (state.botActive) fillCancha(room); }, 1500);
 }
   
@@ -201,38 +201,24 @@ function fillCancha(room) {
     var specs = p.filter(x => x.team === 0 && x.id !== 0 && !state.afkModeUsers[x.id]);
     
     let totalJugadores = red.length + blue.length + specs.length;
+    let cuposLlenos = (red.length === CONFIG.TEAM_SIZE && blue.length === CONFIG.TEAM_SIZE);
 
-    // 🛑 SISTEMA DE FLUJO PROGRESIVO (Solo cuando la bola no rueda)
-    if (room.getScores() == null) {
+    if (room.getScores() == null && !cuposLlenos) {
         
-        // FASE 4: Más de 4 activos (El Pickeo domina la sala)
-        if (totalJugadores > 4) {
-            // Evaluamos si hay gente suficiente para el modo que está configurado
-            if (totalJugadores >= CONFIG.TEAM_SIZE * 2) {
-                if (red.length === CONFIG.TEAM_SIZE && blue.length === CONFIG.TEAM_SIZE) return; // Están jugando o listos
-                iniciarSistemaPickeo(room); 
-                return; // Cortamos
-            } else {
-                return; // Ej: Hay 5 personas, pero el modo es 3v3 (necesita 6). Congelamos todo y esperamos.
-            }
+        // FASE 4: Más jugadores de lo que pide el modo -> ¡SISTEMA DE PICKEO!
+        if (totalJugadores > CONFIG.TEAM_SIZE * 2) {
+            iniciarSistemaPickeo(room); 
+            return; 
         }
 
-        // FASE 3: Exactamente 4 activos
-        if (totalJugadores === 4) {
-            if (CONFIG.TEAM_SIZE === 3) return; // Si es 3v3, congelamos y esperamos a que lleguen los 6.
-            // Si es 2v2, la función simplemente seguirá bajando y los meterá a la cancha automáticamente.
+        // FASE 3: Si están exactos (ej. 4 en 2v2), caen al auto-fill abajo
+        // FASE 2: Si faltan, no mete a nadie, obliga a esperar (excepto para 1v1 en sala vacía)
+        if (totalJugadores < CONFIG.TEAM_SIZE * 2) {
+            if (red.length > 0 || blue.length > 0) return; 
         }
-
-        // FASE 2: Exactamente 3 activos
-        if (totalJugadores === 3) {
-            // Mantenemos el 1v1 activo, el tercero se queda en la banca congelado
-            if (red.length + blue.length >= 2) return; 
-        }
-
-        // FASE 1: 1 a 2 activos (Simplemente bajan y se meten a jugar)
     }
 
-    // 🎟️ AUTO-FILL DIRECTO (Se usa en Fase 1 y Fase 3)
+    // 🎟️ AUTO-FILL (Solo si no hay gente suficiente para pickear)
     specs.sort((a, b) => {
         let aIsVip = state.colaVIP.includes(a.id) ? 1 : 0;
         let bIsVip = state.colaVIP.includes(b.id) ? 1 : 0;
@@ -241,7 +227,6 @@ function fillCancha(room) {
 
     while (specs.length > 0 && (red.length < CONFIG.TEAM_SIZE || blue.length < CONFIG.TEAM_SIZE)) {
         var spec = specs.shift(); 
-
         let vipIndex = state.colaVIP.indexOf(spec.id);
         if (vipIndex !== -1) state.colaVIP.splice(vipIndex, 1);
 
@@ -254,10 +239,9 @@ function fillCancha(room) {
         }
     }
     
-    // Auto-Inicio si se llenaron automáticamente sin pickeo
     red = room.getPlayerList().filter(x => x.team === 1); 
     blue = room.getPlayerList().filter(x => x.team === 2);
-    if (room.getScores() == null && red.length === CONFIG.TEAM_SIZE && blue.length === CONFIG.TEAM_SIZE && totalJugadores <= 4) {
+    if (room.getScores() == null && red.length === CONFIG.TEAM_SIZE && blue.length === CONFIG.TEAM_SIZE) {
         room.sendAnnouncement("🚀 ¡SALA LISTA! Empezando partido rápido...", null, 0x88FF88, "bold");
         setTimeout(() => { room.startGame(); }, 2000);
     }
@@ -273,35 +257,57 @@ function iniciarSistemaPickeo(room) {
     room.stopGame();
     state.isPicking = true;
     
-    // Todos a la tribuna
-    room.getPlayerList().forEach(p => {
-        if (p.team !== 0) room.setPlayerTeam(p.id, 0);
-    });
+    let red = room.getPlayerList().filter(p => p.team === 1);
+    let blue = room.getPlayerList().filter(p => p.team === 2);
+    
+    // Evaluamos si el equipo Rojo ya está lleno (porque son los campeones)
+    let redCompleto = red.length === CONFIG.TEAM_SIZE;
+
+    // Si la sala está fresca y el Rojo no está lleno, mandamos a todos a espectadores
+    if (!redCompleto) {
+        room.getPlayerList().forEach(p => {
+            if (p.team !== 0) room.setPlayerTeam(p.id, 0);
+        });
+    } else {
+        // Solo vaciamos el Azul por seguridad
+        blue.forEach(p => room.setPlayerTeam(p.id, 0));
+    }
 
     let elegibles = getEspectadoresElegibles(room);
 
-    // Seguridad por si alguien se va mientras lee esto
-    if (elegibles.length < CONFIG.TEAM_SIZE * 2) {
-        state.isPicking = false;
-        return;
+    if (!redCompleto) {
+        // 🔄 SALA FRESCA: Ambos capitanes eligen
+        if (elegibles.length < CONFIG.TEAM_SIZE * 2) { state.isPicking = false; return; }
+        let capRojo = elegibles[0];
+        let capAzul = elegibles[1];
+
+        state.capitanes[1] = capRojo.id;
+        state.capitanes[2] = capAzul.id;
+        state.turnoPick = 1; 
+
+        room.setPlayerTeam(capRojo.id, 1);
+        room.setPlayerTeam(capAzul.id, 2);
+
+        room.sendAnnouncement(`👑 ¡SISTEMA DE CAPITANES INICIADO!`, null, 0xFFD700, "bold");
+        room.sendAnnouncement(`🔴 Cap Rojo: ${capRojo.name} | 🔵 Cap Azul: ${capAzul.name}`, null, 0xFFFFFF, "bold");
+        iniciarTurnoCapitan(room, 1);
+        
+    } else {
+        // 👑 REY DE LA CANCHA: Rojo ya está listo. Solo Azul escoge a los retadores.
+        if (elegibles.length < CONFIG.TEAM_SIZE) { state.isPicking = false; return; }
+        let capAzul = elegibles[0];
+
+        state.capitanes[1] = null; // Rojo no tiene capitán ahora
+        state.capitanes[2] = capAzul.id;
+        state.turnoPick = 2; // Empezamos de frente en el turno Azul
+
+        room.setPlayerTeam(capAzul.id, 2);
+
+        room.sendAnnouncement(`👑 ¡NUEVOS RETADORES!`, null, 0xFFD700, "bold");
+        room.sendAnnouncement(`🔵 Capitán Azul: ${capAzul.name}`, null, 0xFFFFFF, "bold");
+        iniciarTurnoCapitan(room, 2);
     }
-
-    let capRojo = elegibles[0];
-    let capAzul = elegibles[1];
-
-    state.capitanes[1] = capRojo.id;
-    state.capitanes[2] = capAzul.id;
-    state.turnoPick = 1; 
-
-    room.setPlayerTeam(capRojo.id, 1);
-    room.setPlayerTeam(capAzul.id, 2);
-
-    room.sendAnnouncement(`👑 ¡SISTEMA DE CAPITANES ${CONFIG.TEAM_SIZE}v${CONFIG.TEAM_SIZE} INICIADO!`, null, 0xFFD700, "bold");
-    room.sendAnnouncement(`🔴 Capitán Rojo: ${capRojo.name} | 🔵 Capitán Azul: ${capAzul.name}`, null, 0xFFFFFF, "bold");
-
-    iniciarTurnoCapitan(room, 1);
 }
-
 
 // ⏱️ EL RELOJ Y LA LISTA
 function iniciarTurnoCapitan(room, equipo) {

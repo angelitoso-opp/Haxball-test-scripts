@@ -20,7 +20,7 @@ HaxballInit().then((HBInit) => {
       maxPlayers: 16,
       public: true, 
       noPlayer: false,
-      token: "thr1.AAAAAGnhLfZ_-Y20-QxwkQ.OKiTyrKgLEQ" // Considera renovarlo si caducó
+      token: "thr1.AAAAAGnnnhRbP--Sw77hfg.f6IkrEIBF8Y" // Considera renovarlo si caducó
     });
 
     room.setTimeLimit(0);
@@ -52,6 +52,11 @@ HaxballInit().then((HBInit) => {
     };
 
     room.onGameStart = function() {
+      // ♾️ SISTEMA DE LÍMITE MANUAL
+      state.scoreLimit = 5; // Volvemos al límite oficial
+      state.juegoTerminadoPorVictoria = false; // Bajamos el escudo de apuestas
+      room.setScoreLimit(0); // Forzamos a Haxball a infinito
+
       // Limpiamos variables
       state.lastTouch = { id: null, team: null, name: "" }; state.secondLastTouch = { id: null, team: null, name: "" };
       state.redTouches = 0; state.blueTouches = 0; state.wasLastTouchBlock = false;
@@ -64,7 +69,6 @@ HaxballInit().then((HBInit) => {
       var redCount = room.getPlayerList().filter(p => p.team === 1).length;
       var blueCount = room.getPlayerList().filter(p => p.team === 2).length;
       
-      // Será Ranked SOLO si ambos equipos tienen la cantidad oficial (ej. 2 vs 2)
       state.isRankedMatch = (redCount === CONFIG.TEAM_SIZE && blueCount === CONFIG.TEAM_SIZE);
       
       if (state.isRankedMatch) {
@@ -79,10 +83,7 @@ HaxballInit().then((HBInit) => {
       // 🎰 APUESTAS
       state.apuestas = {}; 
       state.apuestasAbiertas = true;
-
-      // 💥 Ejecutamos el cálculo de la casa de apuestas
       calcularCuotas(room);
-
       room.sendAnnouncement("🎰 ¡PARTIDO INICIADO! Escribe '!apostar rojo (monto)' o '!apostar azul (monto)'", null, 0xFFD700, "bold");
     };
 
@@ -93,56 +94,59 @@ HaxballInit().then((HBInit) => {
     };
 
     room.onPositionsReset = function() {
-        // Tus variables de reinicio (toques, bloqueos, etc)
-        resetVoleyTouches(); 
-        resetGameVars();
-        normalizeSizes();
+        // 1. Reiniciar variables de Vóley (Toques, bloqueos, etc)
+        state.redTouches = 0; 
+        state.blueTouches = 0; 
+        state.wasLastTouchBlock = false;
+        state.voleyLastTeam = null; 
+        state.voleyLastPlayer = null; 
 
-        // 🎨 FIX: Usamos db_players en vez de db.players
+        // 2. Re-aplicar colores personalizados a los que hayan comprado pintura
         room.getPlayerList().filter(p => p.team !== 0).forEach(p => {
-            if (db_players[p.name] && db_players[p.name].color !== undefined) {
-                room.setPlayerDiscProperties(p.id, { color: db_players[p.name].color });
+            if (db.players[p.name] && db.players[p.name].color !== undefined) {
+                room.setPlayerDiscProperties(p.id, { color: db.players[p.name].color });
             }
         });
 
+        // 3. Sistema Anti-AFK al saque
         if (state.autoAfkActivo) {
             let ahora = Date.now();
             let jugadores = room.getPlayerList().filter(p => p.team !== 0);
             let afksEncontrados = [];
             
-        jugadores.forEach(p => {
-            // Si no se ha movido en los últimos 10 segundos (mientras celebraban el gol)
-            let tiempoInactivo = ahora - (state.afkData[p.id]?.lastMove || 0);
-            if (tiempoInactivo > 10000) { 
-                afksEncontrados.push(p);
-            }
-        });
-
-        if (afksEncontrados.length > 0) {
-            room.pauseGame(true); // PAUSA INMEDIATA
-            afksEncontrados.forEach(p => {
-                room.sendAnnouncement(`⚠️ [SISTEMA]: ${p.name}, parece que estás AFK. Muévete para reanudar.`, null, 0xFF8800, "bold");
+            jugadores.forEach(p => {
+                // Si no se ha movido en los últimos 10 segundos (mientras celebraban el gol)
+                let tiempoInactivo = ahora - (state.afkData[p.id]?.lastMove || 0);
+                if (tiempoInactivo > 10000) { 
+                    afksEncontrados.push(p);
+                }
             });
-            
-            // Re-verificación tras 5 segundos de gracia
-            setTimeout(() => {
-                let todaviaAfks = afksEncontrados.filter(p => (Date.now() - (state.afkData[p.id]?.lastMove || 0)) > 4000);
-                
-                todaviaAfks.forEach(p => {
-                    state.afkStrikes[p.name] = (state.afkStrikes[p.name] || 0) + 1;
-                    if (state.afkStrikes[p.name] >= 2) {
-                        room.kickPlayer(p.id, "deja el afk mano", false);
-                    } else {
-                        room.sendAnnouncement(`💤 ${p.name} enviado a la banca por inactividad al saque.`, null, 0xFF8888);
-                        room.setPlayerTeam(p.id, 0);
-                    }
+
+            if (afksEncontrados.length > 0) {
+                room.pauseGame(true); // PAUSA INMEDIATA
+                afksEncontrados.forEach(p => {
+                    room.sendAnnouncement(`⚠️ [SISTEMA]: ${p.name}, parece que estás AFK. Muévete para reanudar.`, null, 0xFF8800, "bold");
                 });
                 
-                room.pauseGame(false);
-                if (state.botActive) { const { fillCancha } = require('./src/gameplay.js'); fillCancha(room); }
-            }, 5000);
-        };
-      }  
+                // Re-verificación tras 5 segundos de gracia
+                setTimeout(() => {
+                    let todaviaAfks = afksEncontrados.filter(p => (Date.now() - (state.afkData[p.id]?.lastMove || 0)) > 4000);
+                    
+                    todaviaAfks.forEach(p => {
+                        state.afkStrikes[p.name] = (state.afkStrikes[p.name] || 0) + 1;
+                        if (state.afkStrikes[p.name] >= 2) {
+                            room.kickPlayer(p.id, "deja el afk mano", false);
+                        } else {
+                            room.sendAnnouncement(`💤 ${p.name} enviado a la banca por inactividad al saque.`, null, 0xFF8888);
+                            room.setPlayerTeam(p.id, 0);
+                        }
+                    });
+                    
+                    room.pauseGame(false);
+                    if (state.botActive) { const { fillCancha } = require('./src/gameplay.js'); fillCancha(room); }
+                }, 5000);
+            }
+        }  
     };
 
     room.onGameStop = function() {
@@ -153,18 +157,8 @@ HaxballInit().then((HBInit) => {
         state.apuestas = {}; state.apuestasAbiertas = false;
         state.juegoTerminadoPorVictoria = false; // Lo reiniciamos por si acaso
     };
-    room.onPositionsReset = function() {
-        state.redTouches = 0; state.blueTouches = 0; state.wasLastTouchBlock = false;
-        state.voleyLastTeam = null; state.voleyLastPlayer = null; 
 
-        // Re-aplicar colores personalizados a los que hayan comprado pintura
-        room.getPlayerList().filter(p => p.team !== 0).forEach(p => {
-            if (db.players[p.name] && db.players[p.name].color !== undefined) {
-                room.setPlayerDiscProperties(p.id, { color: db.players[p.name].color });
-            }
-        });
-    };
-
+    
 
     let ultimoEnPatear = null;
 
@@ -174,49 +168,47 @@ HaxballInit().then((HBInit) => {
     };
 
     room.onTeamGoal = function(team) {
-
-      procesarGol(team, room); // Llama a gameplay.js
-      explotarConfeti(room);
+        procesarGol(team, room); 
+        explotarConfeti(room);
+        
+        // 🪩 1. EFECTO DISCO (Solo si alguien pateó)
         if (ultimoEnPatear) {
             let goleador = room.getPlayer(ultimoEnPatear);
             
             if (goleador && db.players[goleador.name]) {
                 let datosUsuario = db.players[goleador.name];
-                
-                // Si el goleador compró el efecto disco, ¡lo activamos!
                 if (datosUsuario.efecto === "disco") {
                     room.sendAnnouncement(`🪩 ¡EFECTO DISCO DE ${goleador.name.toUpperCase()}! 🪩`, null, 0xFFD700, "bold");
                     activarEfectoDisco(room, goleador.id, goleador.name);
                 }
             }
+        }
+        
+        // Limpiamos el último en patear
+        ultimoEnPatear = null;
 
-            let puntajes = room.getScores();
+        // 🏆 2. ÁRBITRO DE VICTORIA Y DEUCE (Siempre se ejecuta, haya pateado quien haya pateado)
+        let puntajes = room.getScores();
         if (puntajes) {
             let redPts = puntajes.red;
             let bluePts = puntajes.blue;
 
-            // 🔥 DEUCE: Si empatan a 1 punto del límite (ej. 4-4)
+            // 🔥 DEUCE
             if (redPts === state.scoreLimit - 1 && bluePts === state.scoreLimit - 1) {
                 state.scoreLimit++;
                 room.sendAnnouncement(`🔥 ¡DEUCE! Empate técnico. El límite sube a ${state.scoreLimit} puntos 🔥`, null, 0xFF6600, "bold");
             }
 
-            // 🏆 VICTORIA MANUAL: Si alguien alcanza el límite Y saca 2 puntos de ventaja
+            // 🏆 VICTORIA MANUAL
             let redGana = redPts >= state.scoreLimit && (redPts - bluePts) >= 2;
             let blueGana = bluePts >= state.scoreLimit && (bluePts - redPts) >= 2;
 
             if (redGana || blueGana) {
-                state.juegoTerminadoPorVictoria = true; // Subimos el escudo de apuestas
-                room.stopGame(); // Frenamos el juego manualmente (esto dispara onGameStop al instante)
-                
-                // Procesamos los ELOs y pagos
-                procesarVictoria(puntajes, room); 
+                state.juegoTerminadoPorVictoria = true; // Escudo activado
+                room.stopGame(); // Frenamos manualmente
+                procesarVictoria(puntajes, room); // Entregamos premios y elo
             }
         }
-    }
-    
-    // Limpiamos la variable para el siguiente saque
-    ultimoEnPatear = null;
     };
 
     room.onTeamVictory = function(scores) {

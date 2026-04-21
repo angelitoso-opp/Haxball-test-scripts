@@ -47,25 +47,27 @@ function procesarChat(player, message, room) {
                 let colorAviso = equipoTurno === 1 ? 0xFF8888 : 0x8888FF;
                 room.sendAnnouncement(`✅ ¡${player.name} ha reclutado a ${targetPlayer.name}!`, null, colorAviso, "bold");
 
-               if (equipoTurno === 1) {
-                    state.turnoPick = 2; // Turno del Azul
-                    iniciarTurnoCapitan(room, 2);
-                } else {
-                    // Verificamos si los equipos ya están completos (Para 2v2 terminará rápido, para 3v3 dará otra vuelta)
-                    let redCount = room.getPlayerList().filter(p => p.team === 1).length;
-                    let blueCount = room.getPlayerList().filter(p => p.team === 2).length;
+                // 🧠 EVALUACIÓN INTELIGENTE DE TURNOS
+                let redCount = room.getPlayerList().filter(p => p.team === 1).length;
+                let blueCount = room.getPlayerList().filter(p => p.team === 2).length;
 
-                    if (redCount === CONFIG.TEAM_SIZE && blueCount === CONFIG.TEAM_SIZE) {
-                        state.isPicking = false; // Se acabó el pickeo
-                        room.sendAnnouncement("🚀 ¡EQUIPOS COMPLETOS! Empezando en 2 segundos...", null, 0x88FF88, "bold");
-                        setTimeout(() => { room.startGame(); }, 2000);
-                    } else {
-                        // 🔁 Si faltan jugadores (en 3v3), vuelve a ser el turno del Capitán Rojo
+                if (redCount === CONFIG.TEAM_SIZE && blueCount === CONFIG.TEAM_SIZE) {
+                    state.isPicking = false; // Se acabó el pickeo
+                    room.sendAnnouncement("🚀 ¡EQUIPOS COMPLETOS! Empezando en 2 segundos...", null, 0x88FF88, "bold");
+                    setTimeout(() => { room.startGame(); }, 2000);
+                } else {
+                    // Si faltan cupos, le damos el turno al equipo que tenga menos jugadores
+                    if (redCount < CONFIG.TEAM_SIZE) {
                         state.turnoPick = 1;
                         iniciarTurnoCapitan(room, 1);
+                    } else {
+                        state.turnoPick = 2;
+                        iniciarTurnoCapitan(room, 2);
                     }
                 }
-                return false; 
+                
+                return false;
+            
             }
         }
     }
