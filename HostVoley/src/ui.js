@@ -81,5 +81,5 @@ function iniciarAnuncios(room) {
     }, 90000); 
 }
 
-// Asegúrate de exportar la nueva función iniciarAnuncios
-module.exports = { sendHelpBox, sendWelcomeBox, sendTiendaBox, iniciarAnuncios, sendTiendaBox };
+// Exporta todas las funciones de UI
+module.exports = { sendHelpBox, sendWelcomeBox, sendTiendaBox, iniciarAnuncios };

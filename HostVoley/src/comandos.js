@@ -1,11 +1,12 @@
 const { db, saveDB, getRank, initPlayerDB } = require('./database');
 const { state, CONFIG } = require('./state');
 const { apostar } = require('./apuestas');
-const { fillCancha, iniciarSistemaPickeo ,iniciarTurnoCapitan } = require('./gameplay'); 
-const { sendHelpBox,sendTiendaBox, se } = require('./ui'); // Ajusta la ruta si es necesario
-const { activarEfectoDisco } = require ('./efectos')
+const { fillCancha, iniciarSistemaPickeo, iniciarTurnoCapitan } = require('./gameplay.js'); 
+const { sendHelpBox, sendTiendaBox } = require('./ui.js');
+const { activarEfectoDisco } = require('./efectos.js');
 
 function procesarChat(player, message, room) {
+    
     if (!db.players[player.name]) initPlayerDB(player.name); 
     var dbUser = db.players[player.name];
     var userRank = getRank(dbUser.elo);
@@ -423,6 +424,7 @@ function procesarChat(player, message, room) {
         room.sendAnnouncement(`[${dbUser.tag}] ${userRank.emoji} ${player.name}: ${msg}`, null, userRank.color, "bold");
         return false; 
     }
+    
     return false; 
 }
 

@@ -9,7 +9,7 @@ const { procesarChat } = require('./src/comandos.js');
 const { procesarToqueBola, procesarGol, procesarVictoria } = require('./src/gameplay.js');
 const { sendHelpBox, sendWelcomeBox, sendTiendaBox, iniciarAnuncios } = require('./src/ui.js');
 const { aplicarUniformesAleatorios } = require('./src/uniforms.js');
-const { explotarConfeti, activarEfectoDisco } = require ('./src/efectos.js')
+const { explotarConfeti, activarEfectoDisco } = require('./src/efectos.js');
 
 const HaxballInit = HaxballJS.default || HaxballJS;
 
@@ -41,8 +41,13 @@ HaxballInit().then((HBInit) => {
 
     // === EVENTOS DEL JUEGO ===
     room.onPlayerJoin = function(p) { 
-    initPlayerDB(p.name); 
+    initPlayerDB(p.name);
+    sendWelcomeBox(room, p); 
     gestionarMapas(room); // 👈 ¡NUEVO!
+    };
+
+    room.onPlayerChat = function(player, message) {
+        return procesarChat(player, message, room);
     };
 
    room.onPlayerLeave = function(p) { 
@@ -233,7 +238,7 @@ HaxballInit().then((HBInit) => {
                 let datosUsuario = db.players[goleador.name];
                 if (datosUsuario.efecto === "disco") {
                     room.sendAnnouncement(`🪩 ¡EFECTO DISCO DE ${goleador.name.toUpperCase()}! 🪩`, null, 0xFFD700, "bold");
-                    activarEfectoDisco(room, goleador.id, goleador.name);
+                    activarEfectoDisco(room, goleador.id);
                 }
             }
         }
